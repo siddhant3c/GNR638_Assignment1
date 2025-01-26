@@ -35,7 +35,7 @@ def svm_classify(train_image_feats, train_labels, test_image_feats):
         Predict labels : a list of predict labels of testing images (Dtype = String).
     '''
     
-    SVC = LinearSVC(C=700.0, class_weight=None, dual=True, fit_intercept=True,
+    SVC = LinearSVC(C=1, class_weight=None, dual=True, fit_intercept=True,
                     intercept_scaling=1, loss='squared_hinge', max_iter= 2000,
                     multi_class='ovr', penalty='l2', random_state=0, tol= 1e-4,
                     verbose=0)

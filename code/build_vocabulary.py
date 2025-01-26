@@ -3,6 +3,7 @@ import numpy as np
 from cyvlfeat.sift.dsift import dsift
 from cyvlfeat.kmeans import kmeans
 from time import time
+from tqdm import tqdm
 
 import pdb
 
@@ -82,7 +83,7 @@ def build_vocabulary(image_paths, vocab_size):
     #The Python Debugger
     #pdb.set_trace()
     
-    for path in image_paths:
+    for path in tqdm(image_paths):
         img = np.asarray(Image.open(path),dtype='float32')
         img = img.mean(axis=2)
         # print(img.shape)
@@ -95,7 +96,7 @@ def build_vocabulary(image_paths, vocab_size):
     start_time = time()
     vocab = kmeans(bag_of_features, vocab_size, initialization="PLUSPLUS")        
     end_time = time()
-    print("It takes ", (start_time - end_time), " to compute vocab.")
+    print("It takes ", (end_time - start_time), "seconds to compute vocab, for vocab size:", vocab_size)
     
     
     ##################################################################################

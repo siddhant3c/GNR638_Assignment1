@@ -60,30 +60,85 @@ def main():
 
     # YOU CODE build_vocabulary.py
     print('No existing visual word vocabulary found. Computing one from training images\n')
-    vocab_sizes = [50, 100, 200, 400, 800, 1000, 2000]
-    K = 8 # For k fold cross validation
-    fold_size = len(train_image_paths) // K  # Size of each fold (10 in this case)
+    vocab_sizes = [50, 100, 200, 400]
+    K = 1  # Number of folds for cross-validation
+    fold_size_per_class = 80 // K  # Size of each fold per class (10 images per class)
     accuracy_list = []
     accuracy_list_k = []
+
+    # Group image paths and labels by class
+    class_indices = {label: [] for label in set(train_labels)}
+    for i, label in enumerate(train_labels):
+        class_indices[label].append(i)
+
     for vocab_size in vocab_sizes:
         for k in range(K):
-            # Determine the start and end indices for the validation set
-            val_start_idx = k * fold_size
-            val_end_idx = val_start_idx + fold_size
+            train_image_paths_cv = []
+            val_image_paths_cv = []
+            train_labels_cv = []
+            val_labels_cv = []
+
+            for label, indices in class_indices.items():
+                # Calculate the start and end indices for this fold within the class
+                start_idx = k * fold_size_per_class
+                end_idx = start_idx + fold_size_per_class
+
+                # Split the indices into validation and training sets
+                train_indices = indices[start_idx:end_idx]
+                val_indices = indices[:start_idx] + indices[end_idx:]
+
+                # Append paths and labels for training and validation
+                val_image_paths_cv.extend([train_image_paths[i] for i in val_indices])
+                train_image_paths_cv.extend([train_image_paths[i] for i in train_indices])
+                val_labels_cv.extend([train_labels[i] for i in val_indices])
+                train_labels_cv.extend([train_labels[i] for i in train_indices])
+
+
+            print(f"Fold {k + 1}:")
+            print(f"Train start: {start_idx}, end: {end_idx}")
+            print()
+
+            train_image_paths_cv = train_image_paths
+            val_image_paths_cv = test_image_paths
+            train_labels_cv = train_labels
+
+            if os.path.exists(f'model/vocab_{vocab_size}.pkl'):
+                print('Loading existing vocab with vocab size:', vocab_size, 'fold:', k+1)
+                with open(f'model/vocab_{vocab_size}.pkl', 'rb') as f:
+                    vocab = pickle.load(f)
+            else:
+                print('Computing vocab with vocab size:', vocab_size, 'fold:', k+1)
+                vocab = build_vocabulary(train_image_paths_cv, vocab_size)
+                # save vocab
+                print('Saving vocab with vocab size:', vocab_size, 'fold:', k+1)
+                with open(f'model/vocab_{vocab_size}.pkl', 'wb') as f:
+                    pickle.dump(vocab, f)
+
+            if os.path.exists(f'model/train_image_feats_{vocab_size}.pkl'):
+                print('Loading existing image_feats with vocab size:', vocab_size, 'fold:', k+1)
+                with open(f'model/train_image_feats_{vocab_size}.pkl', 'rb') as f:
+                    train_image_feats_cv = pickle.load(f)
+            else:
+                # YOU CODE get_bags_of_sifts.py
+                print('Computing image_feats with vocab size:', vocab_size, 'fold:', k+1)
+                train_image_feats_cv = get_bags_of_sifts(train_image_paths_cv, vocab);
+                # save train_image_feats
+                print('Saving image_feats with vocab size:', vocab_size, 'fold:', k+1)
+                with open(f'model/train_image_feats_{vocab_size}.pkl', 'wb') as f:
+                    pickle.dump(train_image_feats_cv, f)
+
             
-            # Slice the list to get the validation and training sets
-            val_image_paths_cv = train_image_paths[val_start_idx:val_end_idx]
-            train_image_paths_cv = train_image_paths[:val_start_idx] + train_image_paths[val_end_idx:]
-
-            train_labels_cv = train_labels[:val_start_idx] + train_labels[val_end_idx:]
-
-            print('Computing vocab with vocab size:', vocab_size, 'fold:', k+1)
-            vocab = build_vocabulary(train_image_paths_cv, vocab_size)
-
-            # YOU CODE get_bags_of_sifts.py
-            print('Computing image_feats with vocab size:', vocab_size, 'fold:', k+1)
-            train_image_feats_cv = get_bags_of_sifts(train_image_paths_cv, vocab);
-            val_image_feats_cv  = get_bags_of_sifts(val_image_paths_cv, vocab);
+            if os.path.exists(f'model/val_image_feats_{vocab_size}.pkl'):
+                print('Loading existing val_image_feats with vocab size:', vocab_size, 'fold:', k+1)
+                with open(f'model/val_image_feats_{vocab_size}.pkl', 'rb') as f:
+                    val_image_feats_cv = pickle.load(f)
+            else:
+                print('Computing image_feats with vocab size:', vocab_size, 'fold:', k+1)
+                val_image_feats_cv  = get_bags_of_sifts(val_image_paths_cv, vocab);
+                # save val_image_feats
+                print('Saving val_image_feats with vocab size:', vocab_size, 'fold:', k+1)
+                with open(f'model/val_image_feats_{vocab_size}.pkl', 'wb') as f:
+                    pickle.dump(val_image_feats_cv, f)
 
             # YOU CODE svm_classify.py
             print('Classifying with vocab size:', vocab_size, 'fold:', k+1)
@@ -95,29 +150,74 @@ def main():
 
         accuracy_list.append(accuracy_list_k)
 
+        # exit()
+
     print("#######################################################################################3")
 
     # Find the best vocab size
     best_vocab_size = vocab_sizes[np.argmax(np.mean(accuracy_list, axis=1))]
     print('Best vocab size:', best_vocab_size)
 
-    # Train the model with the best vocab size
-    vocab = build_vocabulary(train_image_paths, best_vocab_size)
+    # Plot the average accuracy for each vocab size
+    plt.plot(vocab_sizes, np.mean(accuracy_list, axis=1))
+    plt.xlabel('Vocab Size')
+    plt.ylabel('Mean Accuracy')
+    plt.title('Accuracy vs Vocab Size')
+    plt.tight_layout()
+    # save the plot
+    plt.savefig('plots/accuracy_vs_vocab_size.png')
+    plt.show()
 
-    train_image_feats = get_bags_of_sifts(train_image_paths, vocab)
-    test_image_feats = get_bags_of_sifts(test_image_paths, vocab)
+
+    # Train the model with the best vocab size
+    if os.path.exists(f'model/vocab_{best_vocab_size}.pkl'):
+        print('Loading existing vocab with vocab size:', best_vocab_size)
+        with open(f'model/vocab_{best_vocab_size}.pkl', 'rb') as f:
+            vocab = pickle.load(f)
+    else:
+        print('Computing vocab with vocab size:', best_vocab_size)
+        vocab = build_vocabulary(train_image_paths, best_vocab_size)
+        # save vocab
+        print('Saving vocab with vocab size:', best_vocab_size)
+        with open(f'model/vocab_{best_vocab_size}.pkl', 'wb') as f:
+            pickle.dump(vocab, f)
+
+    if os.path.exists(f'model/train_image_feats_{best_vocab_size}.pkl'):
+        print('Loading existing image_feats with vocab size:', best_vocab_size)
+        with open(f'model/train_image_feats_{best_vocab_size}.pkl', 'rb') as f:
+            train_image_feats = pickle.load(f)
+    else:
+        # YOU CODE get_bags_of_sifts.py
+        print('Computing image_feats with vocab size:', best_vocab_size)
+        train_image_feats = get_bags_of_sifts(train_image_paths, vocab);
+        # save train_image_feats
+        print('Saving image_feats with vocab size:', best_vocab_size)
+        with open(f'model/train_image_feats_{best_vocab_size}.pkl', 'wb') as f:
+            pickle.dump(train_image_feats, f)
+    
+    if os.path.exists(f'model/test_image_feats_{best_vocab_size}.pkl'):
+        print('Loading existing test_image_feats with vocab size:', best_vocab_size)
+        with open(f'model/test_image_feats_{best_vocab_size}.pkl', 'rb') as f:
+            test_image_feats = pickle.load(f)
+    else:
+        print('Computing image_feats with vocab size:', best_vocab_size)
+        test_image_feats  = get_bags_of_sifts(test_image_paths, vocab);
+        # save test_image_feats
+        print('Saving test_image_feats with vocab size:', best_vocab_size)
+        with open(f'model/test_image_feats_{best_vocab_size}.pkl', 'wb') as f:
+            pickle.dump(test_image_feats, f)
 
     predicted_categories = svm_classify(train_image_feats, train_labels, test_image_feats)
 
     accuracy = float(len([x for x in zip(test_labels,predicted_categories) if x[0]== x[1]]))/float(len(test_labels))
     print("Accuracy = ", accuracy)
     
-    # test_labels_ids = [CATE2ID[x] for x in test_labels]
-    # predicted_categories_ids = [CATE2ID[x] for x in predicted_categories]
-    # train_labels_ids = [CATE2ID[x] for x in train_labels]
+    test_labels_ids = [CATE2ID[x] for x in test_labels]
+    predicted_categories_ids = [CATE2ID[x] for x in predicted_categories]
+    train_labels_ids = [CATE2ID[x] for x in train_labels]
    
-    # build_confusion_mtx(test_labels_ids, predicted_categories_ids, ABBR_CATEGORIES)
-    # visualize(CATEGORIES, test_image_paths, test_labels_ids, predicted_categories_ids, train_image_paths, train_labels_ids)
+    build_confusion_mtx(test_labels_ids, predicted_categories_ids, ABBR_CATEGORIES)
+    visualize(CATEGORIES, test_image_paths, test_labels_ids, predicted_categories_ids, train_image_paths, train_labels_ids)
 
 def build_confusion_mtx(test_labels_ids, predicted_categories, abbr_categories):
     # Compute confusion matrix

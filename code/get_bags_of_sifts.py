@@ -5,6 +5,7 @@ import pickle
 import scipy.spatial.distance as distance
 from cyvlfeat.sift.dsift import dsift
 from time import time
+from tqdm import tqdm
 import pdb
 
 def get_bags_of_sifts(image_paths, vocab):
@@ -42,8 +43,9 @@ def get_bags_of_sifts(image_paths, vocab):
     start_time = time()
     print("Construct bags of sifts...")
     
-    for path in image_paths:
+    for path in tqdm(image_paths):
         img = np.asarray(Image.open(path),dtype='float32')
+        img = img.mean(axis=2)
         frames, descriptors = dsift(img, step=[1,1], fast=True)
         dist = distance.cdist(vocab, descriptors, metric='euclidean')
         idx = np.argmin(dist, axis=0)
@@ -55,7 +57,7 @@ def get_bags_of_sifts(image_paths, vocab):
     image_feats = np.asarray(image_feats)
     
     end_time = time()
-    print("It takes ", (start_time - end_time), " to construct bags of sifts.")
+    print("It takes ", (end_time - start_time), " seconds to construct bags of sifts.")
     
     #############################################################################
     #                                END OF YOUR CODE                           #
