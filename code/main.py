@@ -61,10 +61,9 @@ def main():
     # YOU CODE build_vocabulary.py
     print('No existing visual word vocabulary found. Computing one from training images\n')
     vocab_sizes = [50, 100, 200, 400]
-    K = 1  # Number of folds for cross-validation
+    K = 8  # Number of folds for cross-validation
     fold_size_per_class = 80 // K  # Size of each fold per class (10 images per class)
     accuracy_list = []
-    accuracy_list_k = []
 
     # Group image paths and labels by class
     class_indices = {label: [] for label in set(train_labels)}
@@ -72,6 +71,7 @@ def main():
         class_indices[label].append(i)
 
     for vocab_size in vocab_sizes:
+        accuracy_list_k = []
         for k in range(K):
             train_image_paths_cv = []
             val_image_paths_cv = []
@@ -98,9 +98,9 @@ def main():
             print(f"Train start: {start_idx}, end: {end_idx}")
             print()
 
-            train_image_paths_cv = train_image_paths
-            val_image_paths_cv = test_image_paths
-            train_labels_cv = train_labels
+            # train_image_paths_cv = train_image_paths
+            # val_image_paths_cv = test_image_paths
+            # train_labels_cv = train_labels
 
             if os.path.exists(f'model/vocab_{vocab_size}.pkl'):
                 print('Loading existing vocab with vocab size:', vocab_size, 'fold:', k+1)
@@ -147,6 +147,7 @@ def main():
             accuracy = float(len([x for x in zip(test_labels,predicted_categories) if x[0]== x[1]]))/float(len(test_labels))
             print('Accuracy for vocab size:', vocab_size, 'fold:', k+1, 'is:', accuracy)
             accuracy_list_k.append(accuracy)
+            i = i + 1
 
         accuracy_list.append(accuracy_list_k)
 
@@ -155,6 +156,9 @@ def main():
     print("#######################################################################################3")
 
     # Find the best vocab size
+    print('Accuracy list:', accuracy_list)
+    print('Mean accuracy:', np.mean(accuracy_list, axis=1))
+    print('Argmax:', np.argmax(np.mean(accuracy_list, axis=1)))
     best_vocab_size = vocab_sizes[np.argmax(np.mean(accuracy_list, axis=1))]
     print('Best vocab size:', best_vocab_size)
 
@@ -249,6 +253,8 @@ def plot_confusion_matrix(cm, category, title='Confusion matrix', cmap=plt.cm.Bl
     plt.tight_layout()
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
+    plt.savefig('plots/confusion_matrix.png')
+    plt.show()
 
 if __name__ == '__main__':
     main()
